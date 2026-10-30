@@ -1,0 +1,49 @@
+name: Build Waypoint IPA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Download source
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Build unsigned iPhone app
+        run: |
+          xcodebuild archive \
+            -project StikDebug.xcodeproj \
+            -scheme StikDebug \
+            -configuration Debug \
+            -archivePath "$RUNNER_TEMP/Waypoint.xcarchive" \
+            -destination 'generic/platform=iOS' \
+            -sdk iphoneos \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            ONLY_ACTIVE_ARCH=NO \
+            SWIFT_OPTIMIZATION_LEVEL=-Onone
+
+      - name: Package IPA
+        run: |
+          mkdir -p "$RUNNER_TEMP/package/Payload"
+          ditto \
+            "$RUNNER_TEMP/Waypoint.xcarchive/Products/Applications/StikDebug.app" \
+            "$RUNNER_TEMP/package/Payload/StikDebug.app"
+          cd "$RUNNER_TEMP/package"
+          /usr/bin/zip -qr Waypoint-unsigned.ipa Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Waypoint-IPA
+          path: ${{ runner.temp }}/package/Waypoint-unsigned.ipa
+          if-no-files-found: error
